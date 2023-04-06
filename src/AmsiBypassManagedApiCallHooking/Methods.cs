@@ -135,7 +135,7 @@ namespace Editor {
             /*if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, oldprotect, out oldprotect)) {
                 throw new Win32Exception();
             }*/
-            //Syscall.NtProtectVirtualMemory(GetCurrentProcess(), ref originalSite, ref AllocationSize, oldprotect);
+            Syscall.NtProtectVirtualMemory(GetCurrentProcess(), ref originalSite, ref AllocationSize, oldprotect);
 
         }
         private static string Transform(string input) {
